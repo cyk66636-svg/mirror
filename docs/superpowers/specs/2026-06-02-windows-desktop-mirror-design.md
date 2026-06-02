@@ -25,6 +25,7 @@ The implementation will use Tauri 2, React, and TypeScript. The design keeps cam
 - Exit fullscreen and close the application from the control bar.
 - Persist user preferences locally and restore them on the next launch.
 - Show clear recovery UI when camera access fails or no usable device is available.
+- Package the Windows installer so it creates and uses `D:\Mirror` as the application folder.
 
 ### Deferred For Later Releases
 
@@ -199,7 +200,8 @@ The visual treatment should remain simple enough that the display continues to f
 - Photo output matches the visible mirrored crop and saves under `Pictures\Mirror`.
 - Settings restore correctly after restarting the application.
 - Permission-denied and no-camera states are understandable and retryable.
+- Installing the packaged NSIS setup creates `D:\Mirror` and places the application there.
 
 ## Delivery Boundary
 
-The first implementation is complete when the Windows Tauri application can be run locally, produces a packaged Windows build, and passes the automated and manual verification checks above. Later beauty, filter, and recording work will be planned separately.
+The first implementation is complete when the Windows Tauri application can be run locally, produces a packaged Windows build that installs under `D:\Mirror`, and passes the automated and manual verification checks above. Later beauty, filter, and recording work will be planned separately.

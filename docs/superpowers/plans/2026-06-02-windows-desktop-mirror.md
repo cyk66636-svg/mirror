@@ -1923,7 +1923,9 @@ git commit -m "feat: build fullscreen mirror interface"
 ## Task 10: Run Windows App Verification And Package The Installer
 
 **Files:**
-- Modify only if verification reveals a defect
+- Create: `src-tauri/windows/installer-hooks.nsh`
+- Modify: `src-tauri/tauri.conf.json`
+- Modify other source files only if verification reveals a defect
 
 - [ ] **Step 1: Start the desktop app**
 
@@ -1952,7 +1954,28 @@ Check:
 - Restart restores settings.
 - Denied permission and no-device states show a retry button.
 
-- [ ] **Step 3: Package the Windows installer**
+- [ ] **Step 3: Configure the fixed application folder**
+
+Create `src-tauri/windows/installer-hooks.nsh`:
+
+```nsh
+!macro NSIS_HOOK_PREINSTALL
+  StrCpy $INSTDIR "D:\Mirror"
+  CreateDirectory "$INSTDIR"
+!macroend
+```
+
+Add the NSIS hooks file under `bundle.windows` in `src-tauri/tauri.conf.json`:
+
+```json
+{
+  "nsis": {
+    "installerHooks": "./windows/installer-hooks.nsh"
+  }
+}
+```
+
+- [ ] **Step 4: Package the Windows installer**
 
 Stop the dev app and run:
 
@@ -1962,7 +1985,13 @@ npm run tauri build
 
 Expected: an NSIS installer is created under `src-tauri\target\release\bundle\nsis`.
 
-- [ ] **Step 4: Run final checks**
+- [ ] **Step 5: Verify the installer folder**
+
+Run the generated NSIS setup and complete installation.
+
+Expected: setup creates `D:\Mirror` and installs the application into that folder.
+
+- [ ] **Step 6: Run final checks**
 
 Run:
 
@@ -1975,13 +2004,13 @@ git status --short
 
 Expected: all tests pass, frontend build succeeds, Rust tests pass, and only intentional installer artifacts remain ignored.
 
-- [ ] **Step 5: Commit any verification fixes**
+- [ ] **Step 7: Commit installer configuration and any verification fixes**
 
 If manual verification required source changes:
 
 ```powershell
 git add src src-tauri package.json package-lock.json
-git commit -m "fix: address Windows mirror verification"
+git commit -m "feat: package Mirror under D drive folder"
 ```
 
 ## Coverage Checklist
@@ -1998,3 +2027,4 @@ git commit -m "fix: address Windows mirror verification"
 - Persisted preferences: Task 3 and Task 6.
 - Camera and photo recovery states: Task 5, Task 9, and Task 10.
 - Packaged Windows installer: Task 10.
+- Fixed `D:\Mirror` installation folder: Task 10.
