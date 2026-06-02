@@ -115,6 +115,32 @@ describe("useCamera", () => {
     expect(videoTrack.stop).toHaveBeenCalledOnce();
   });
 
+  it("stops a newly acquired stream promptly when unmounted during refresh", async () => {
+    const videoTrack = track("front");
+    const activeStream = stream(videoTrack);
+    const pendingRefresh = deferred<MediaDeviceInfo[]>();
+    const media = installMediaDevices({
+      devices: [camera("front")],
+      getUserMedia: vi.fn().mockResolvedValue(activeStream),
+    });
+    media.enumerateDevices
+      .mockResolvedValueOnce([camera("front")])
+      .mockReturnValueOnce(pendingRefresh.promise);
+
+    const { unmount } = renderHook(() => useCamera("front"));
+    await waitFor(() => expect(media.enumerateDevices).toHaveBeenCalledTimes(2));
+
+    unmount();
+
+    expect(videoTrack.stop).toHaveBeenCalledOnce();
+
+    await act(async () => {
+      pendingRefresh.resolve([camera("front")]);
+      await pendingRefresh.promise;
+    });
+    expect(videoTrack.stop).toHaveBeenCalledOnce();
+  });
+
   it("falls back before startup when the preferred camera is disconnected", async () => {
     const activeStream = stream(track("front"));
     const media = installMediaDevices({
@@ -207,6 +233,112 @@ describe("useCamera", () => {
       video: { deviceId: { exact: "front" } },
       audio: false,
     });
+  });
+
+  it("retries a failed camera switch with the requested camera", async () => {
+    const frontStream = stream(track("front"));
+    const usbStream = stream(track("usb"));
+    const media = installMediaDevices({
+      devices: [camera("front"), camera("usb")],
+      getUserMedia: vi
+        .fn()
+        .mockResolvedValueOnce(frontStream)
+        .mockRejectedValueOnce(new Error("switch failed"))
+        .mockResolvedValueOnce(usbStream),
+    });
+    const { result } = renderHook(() => useCamera("front"));
+    await waitFor(() => expect(result.current.stream).toBe(frontStream));
+
+    await act(() => result.current.selectCamera("usb"));
+    expect(result.current.error).toBe("stream-error");
+
+    await act(() => result.current.retry());
+
+    expect(result.current.stream).toBe(usbStream);
+    expect(media.getUserMedia).toHaveBeenLastCalledWith({
+      video: { deviceId: { exact: "usb" } },
+      audio: false,
+    });
+  });
+
+  it("falls back to a refreshed camera when the acquired track omits its device id", async () => {
+    const activeStream = stream(track());
+    const media = installMediaDevices({
+      getUserMedia: vi.fn().mockResolvedValue(activeStream),
+    });
+    media.enumerateDevices
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([camera("front")]);
+    const { result } = renderHook(() => useCamera());
+
+    await waitFor(() => expect(result.current.stream).toBe(activeStream));
+
+    expect(media.getUserMedia).toHaveBeenCalledWith({
+      video: true,
+      audio: false,
+    });
+    expect(result.current.cameraId).toBe("front");
+  });
+
+  it("switches to an attached fallback camera after the active camera is removed", async () => {
+    const frontTrack = track("front");
+    const usbTrack = track("usb");
+    const frontStream = stream(frontTrack);
+    const usbStream = stream(usbTrack);
+    const media = installMediaDevices({
+      devices: [camera("front"), camera("usb")],
+      getUserMedia: vi
+        .fn()
+        .mockResolvedValueOnce(frontStream)
+        .mockResolvedValueOnce(usbStream),
+    });
+    media.enumerateDevices
+      .mockResolvedValueOnce([camera("front"), camera("usb")])
+      .mockResolvedValueOnce([camera("front"), camera("usb")])
+      .mockResolvedValue([camera("usb")]);
+    const { result } = renderHook(() => useCamera("front"));
+    await waitFor(() => expect(result.current.stream).toBe(frontStream));
+    const changeListener = media.addEventListener.mock.calls[0]?.[1] as () => void;
+
+    await act(async () => {
+      changeListener();
+    });
+    await waitFor(() => expect(result.current.stream).toBe(usbStream));
+
+    expect(frontTrack.stop).toHaveBeenCalledOnce();
+    expect(media.getUserMedia).toHaveBeenLastCalledWith({
+      video: { deviceId: { exact: "usb" } },
+      audio: false,
+    });
+    expect(result.current.cameras.map(({ deviceId }) => deviceId)).toEqual([
+      "usb",
+    ]);
+    expect(result.current.cameraId).toBe("usb");
+  });
+
+  it("refreshes camera options without restarting when another camera is connected", async () => {
+    const frontTrack = track("front");
+    const frontStream = stream(frontTrack);
+    const media = installMediaDevices({
+      devices: [camera("front"), camera("usb")],
+      getUserMedia: vi.fn().mockResolvedValue(frontStream),
+    });
+    media.enumerateDevices
+      .mockResolvedValueOnce([camera("front")])
+      .mockResolvedValueOnce([camera("front")])
+      .mockResolvedValueOnce([camera("front"), camera("usb")]);
+    const { result } = renderHook(() => useCamera("front"));
+    await waitFor(() => expect(result.current.stream).toBe(frontStream));
+    const changeListener = media.addEventListener.mock.calls[0]?.[1] as () => void;
+
+    await act(async () => {
+      changeListener();
+    });
+    await waitFor(() => expect(result.current.cameras).toHaveLength(2));
+
+    expect(result.current.stream).toBe(frontStream);
+    expect(media.getUserMedia).toHaveBeenCalledOnce();
+    expect(frontTrack.stop).not.toHaveBeenCalled();
   });
 
   it("reports a stream error when media devices are unavailable", async () => {

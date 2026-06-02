@@ -13,18 +13,23 @@ function videoInputs(devices: MediaDeviceInfo[]): MediaDeviceInfo[] {
   return devices.filter((device) => device.kind === "videoinput");
 }
 
-export function useCamera(preferredCameraId?: string) {
+export function useCamera(initialCameraId?: string) {
   const [stream, setStream] = useState<MediaStream>();
   const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
   const [cameraId, setCameraId] = useState<string>();
   const [error, setError] = useState<CameraErrorKind>();
   const activeStream = useRef<MediaStream | undefined>(undefined);
-  const activeCameraId = useRef(preferredCameraId);
+  const activeStreamGeneration = useRef<number | undefined>(undefined);
+  const activeCameraId = useRef<string | undefined>(undefined);
+  const retryCameraId = useRef(initialCameraId);
   const requestGeneration = useRef(0);
 
   const stop = useCallback(() => {
-    stopTracks(activeStream.current);
+    const currentStream = activeStream.current;
     activeStream.current = undefined;
+    activeStreamGeneration.current = undefined;
+    activeCameraId.current = undefined;
+    stopTracks(currentStream);
   }, []);
 
   const start = useCallback(
@@ -49,6 +54,7 @@ export function useCamera(preferredCameraId?: string) {
         setCameras(available);
 
         const nextCameraId = chooseCameraId(available, requestedId);
+        retryCameraId.current = nextCameraId;
         nextStream = await mediaDevices.getUserMedia({
           video: nextCameraId ? { deviceId: { exact: nextCameraId } } : true,
           audio: false,
@@ -57,22 +63,35 @@ export function useCamera(preferredCameraId?: string) {
           stopTracks(nextStream);
           return;
         }
+        activeStream.current = nextStream;
+        activeStreamGeneration.current = generation;
 
         const refreshed = videoInputs(await mediaDevices.enumerateDevices());
         if (generation !== requestGeneration.current) {
-          stopTracks(nextStream);
+          if (
+            activeStream.current === nextStream &&
+            activeStreamGeneration.current === generation
+          ) {
+            stop();
+          }
           return;
         }
 
         const actualCameraId =
-          nextStream.getVideoTracks()[0]?.getSettings().deviceId ?? nextCameraId;
-        activeStream.current = nextStream;
+          nextStream.getVideoTracks()[0]?.getSettings().deviceId ??
+          chooseCameraId(refreshed, nextCameraId);
         activeCameraId.current = actualCameraId;
+        retryCameraId.current = actualCameraId;
         setStream(nextStream);
         setCameras(refreshed);
         setCameraId(actualCameraId);
       } catch (cause) {
-        stopTracks(nextStream);
+        if (
+          activeStream.current === nextStream &&
+          activeStreamGeneration.current === generation
+        ) {
+          stop();
+        }
         if (generation !== requestGeneration.current) {
           return;
         }
@@ -86,14 +105,42 @@ export function useCamera(preferredCameraId?: string) {
 
   useEffect(() => {
     const mediaDevices = navigator.mediaDevices;
-    const refresh = () => void start(activeCameraId.current);
+    let disposed = false;
+    const refresh = async () => {
+      try {
+        const available = videoInputs(await mediaDevices.enumerateDevices());
+        if (disposed) {
+          return;
+        }
+        setCameras(available);
 
-    void start(activeCameraId.current);
-    mediaDevices?.addEventListener("devicechange", refresh);
+        const activeId = activeCameraId.current;
+        const fallbackId = chooseCameraId(
+          available,
+          activeId ?? retryCameraId.current,
+        );
+        const activeCameraMissing =
+          activeId !== undefined &&
+          !available.some((device) => device.deviceId === activeId);
+        if (
+          activeCameraMissing ||
+          (activeStream.current === undefined && fallbackId !== undefined)
+        ) {
+          void start(fallbackId);
+        }
+      } catch {
+        // Keep an active stream running if a device inventory refresh fails.
+      }
+    };
+    const handleDeviceChange = () => void refresh();
+
+    void start(retryCameraId.current);
+    mediaDevices?.addEventListener("devicechange", handleDeviceChange);
 
     return () => {
+      disposed = true;
       ++requestGeneration.current;
-      mediaDevices?.removeEventListener("devicechange", refresh);
+      mediaDevices?.removeEventListener("devicechange", handleDeviceChange);
       stop();
     };
   }, [start, stop]);
@@ -103,7 +150,7 @@ export function useCamera(preferredCameraId?: string) {
     cameras,
     cameraId,
     error,
-    retry: () => start(activeCameraId.current),
+    retry: () => start(retryCameraId.current),
     selectCamera: (nextCameraId: string) => start(nextCameraId),
   };
 }
