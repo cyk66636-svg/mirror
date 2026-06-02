@@ -13,4 +13,8 @@ describe("reduceControlVisibility", () => {
   it("keeps visible pinned controls revealed when hiding", () => {
     expect(reduceControlVisibility(true, true, "hide")).toBe(true);
   });
+
+  it("reveals hidden pinned controls when hiding", () => {
+    expect(reduceControlVisibility(false, true, "hide")).toBe(true);
+  });
 });

@@ -92,6 +92,23 @@ describe("useControlVisibility", () => {
     expect(result.current.visible).toBe(true);
   });
 
+  it("clears a pending hide when controls become pinned", () => {
+    const { result, rerender } = renderHook(
+      ({ pinned }) => useControlVisibility(pinned),
+      { initialProps: { pinned: false } },
+    );
+
+    act(() => {
+      result.current.scheduleHide();
+    });
+    expect(vi.getTimerCount()).toBe(1);
+
+    rerender({ pinned: true });
+
+    expect(result.current.visible).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it("uses the latest pinned value when a pending hide runs", () => {
     const { result, rerender } = renderHook(
       ({ pinned }) => useControlVisibility(pinned),

@@ -1,5 +1,5 @@
 import { act, renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_SETTINGS } from "../features/settings/mirrorSettings";
 import { useMirrorSettings } from "./useMirrorSettings";
 
@@ -7,6 +7,10 @@ const SETTINGS_KEY = "mirror.settings.v1";
 
 beforeEach(() => {
   localStorage.clear();
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 describe("useMirrorSettings", () => {
@@ -56,5 +60,27 @@ describe("useMirrorSettings", () => {
 
     expect(result.current.settings.zoom).toBe(2);
     expect(JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? "{}").zoom).toBe(2);
+  });
+
+  it("updates in-memory settings when persistence fails", () => {
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("storage unavailable");
+    });
+    const { result } = renderHook(() => useMirrorSettings());
+
+    act(() => {
+      result.current.patchSettings({ brightness: 14 });
+    });
+
+    expect(result.current.settings.brightness).toBe(14);
+  });
+
+  it("keeps patchSettings stable across rerenders", () => {
+    const { result, rerender } = renderHook(() => useMirrorSettings());
+    const { patchSettings } = result.current;
+
+    rerender();
+
+    expect(result.current.patchSettings).toBe(patchSettings);
   });
 });

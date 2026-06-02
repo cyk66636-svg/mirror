@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { reduceControlVisibility } from "../features/controls/controlVisibility";
 
 const HIDE_DELAY_MS = 1200;
@@ -7,7 +7,6 @@ export function useControlVisibility(pinned: boolean) {
   const [visible, setVisible] = useState(pinned);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const pinnedRef = useRef(pinned);
-  pinnedRef.current = pinned;
 
   const clearPendingHide = useCallback(() => {
     if (hideTimer.current !== undefined) {
@@ -33,7 +32,8 @@ export function useControlVisibility(pinned: boolean) {
     }, HIDE_DELAY_MS);
   }, [clearPendingHide]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    pinnedRef.current = pinned;
     if (pinned) {
       reveal();
     }

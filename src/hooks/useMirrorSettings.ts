@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   loadSettings,
   normalizeSettings,
@@ -9,12 +9,16 @@ import {
 export function useMirrorSettings() {
   const [settings, setSettings] = useState(() => loadSettings(localStorage));
 
+  useEffect(() => {
+    try {
+      saveSettings(localStorage, settings);
+    } catch {
+      // Keep in-memory settings usable when persistence is unavailable.
+    }
+  }, [settings]);
+
   const patchSettings = useCallback((patch: Partial<MirrorSettings>) => {
-    setSettings((current) => {
-      const normalizedNext = normalizeSettings({ ...current, ...patch });
-      saveSettings(localStorage, normalizedNext);
-      return normalizedNext;
-    });
+    setSettings((current) => normalizeSettings({ ...current, ...patch }));
   }, []);
 
   return { settings, patchSettings };

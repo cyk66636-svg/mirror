@@ -5,9 +5,6 @@ export function reduceControlVisibility(
   pinned: boolean,
   action: VisibilityAction,
 ): boolean {
-  if (action === "reveal") {
-    return true;
-  }
-
-  return pinned ? visible : false;
+  void visible;
+  return action === "reveal" || pinned;
 }
