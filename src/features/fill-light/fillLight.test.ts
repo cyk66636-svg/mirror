@@ -24,4 +24,12 @@ describe("fill light style", () => {
       opacity: 1,
     });
   });
+
+  it("uses zero brightness when brightness is non-finite", () => {
+    expect(getFillLightStyle(NaN, 50).opacity).toBe(0);
+  });
+
+  it("uses a neutral temperature when temperature is non-finite", () => {
+    expect(getFillLightStyle(100, NaN).backgroundColor).toBe("rgb(235 229 223)");
+  });
 });

@@ -10,6 +10,19 @@ export function computeCoverCrop(
   viewportHeight: number,
   zoom: number,
 ): Crop {
+  if (
+    !Number.isFinite(viewportWidth) ||
+    viewportWidth <= 0 ||
+    !Number.isFinite(viewportHeight) ||
+    viewportHeight <= 0
+  ) {
+    throw new RangeError("Viewport dimensions must be positive finite numbers.");
+  }
+
+  if (!Number.isFinite(zoom)) {
+    throw new RangeError("Zoom must be a finite number.");
+  }
+
   const sourceAspectRatio = sourceWidth / sourceHeight;
   const viewportAspectRatio = viewportWidth / viewportHeight;
   const baseWidth =
