@@ -29,7 +29,24 @@ describe("mirror settings", () => {
 
   it("falls back to defaults for invalid JSON", () => {
     const storage = { getItem: () => "{", setItem: () => undefined };
-    expect(loadSettings(storage)).toEqual(DEFAULT_SETTINGS);
+    const settings = loadSettings(storage);
+    expect(settings).toEqual(DEFAULT_SETTINGS);
+    expect(settings).not.toBe(DEFAULT_SETTINGS);
+  });
+
+  it("returns independent defaults when stored settings are missing", () => {
+    const storage = { getItem: () => null, setItem: () => undefined };
+    const first = loadSettings(storage);
+    const defaultBrightness = DEFAULT_SETTINGS.brightness;
+
+    try {
+      first.brightness = 0;
+      const second = loadSettings(storage);
+      expect(second.brightness).toBe(78);
+      expect(first).not.toBe(second);
+    } finally {
+      DEFAULT_SETTINGS.brightness = defaultBrightness;
+    }
   });
 
   it("stores normalized settings", () => {
@@ -50,6 +67,13 @@ describe("mirror settings", () => {
 
   it.each([null, true, "12"])(
     "does not coerce non-number brightness value %j",
+    (brightness) => {
+      expect(normalizeSettings({ brightness }).brightness).toBe(78);
+    },
+  );
+
+  it.each([NaN, Infinity, -Infinity])(
+    "replaces non-finite brightness value %j with the default",
     (brightness) => {
       expect(normalizeSettings({ brightness }).brightness).toBe(78);
     },

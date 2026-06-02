@@ -62,9 +62,9 @@ export function normalizeSettings(value: unknown): MirrorSettings {
 export function loadSettings(storage: StorageLike): MirrorSettings {
   try {
     const raw = storage.getItem(SETTINGS_KEY);
-    return raw ? normalizeSettings(JSON.parse(raw)) : DEFAULT_SETTINGS;
+    return raw ? normalizeSettings(JSON.parse(raw)) : normalizeSettings(DEFAULT_SETTINGS);
   } catch {
-    return DEFAULT_SETTINGS;
+    return normalizeSettings(DEFAULT_SETTINGS);
   }
 }
 
