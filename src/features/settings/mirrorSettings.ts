@@ -21,8 +21,9 @@ const numberInRange = (
   min: number,
   max: number,
 ) => {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? clamp(parsed, min, max) : fallback;
+  return typeof value === "number" && Number.isFinite(value)
+    ? clamp(value, min, max)
+    : fallback;
 };
 
 export const DEFAULT_SETTINGS: MirrorSettings = {

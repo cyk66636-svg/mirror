@@ -47,4 +47,11 @@ describe("mirror settings", () => {
   it("replaces non-numeric values with defaults", () => {
     expect(normalizeSettings({ brightness: "bright" }).brightness).toBe(78);
   });
+
+  it.each([null, true, "12"])(
+    "does not coerce non-number brightness value %j",
+    (brightness) => {
+      expect(normalizeSettings({ brightness }).brightness).toBe(78);
+    },
+  );
 });
