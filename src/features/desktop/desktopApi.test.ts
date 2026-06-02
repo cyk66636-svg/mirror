@@ -22,12 +22,17 @@ describe("desktop API", () => {
     vi.clearAllMocks();
   });
 
-  it("saves PNG bytes through the native command", () => {
-    desktopApi.savePhoto(new Uint8Array([1, 2, 3]));
+  it("saves PNG bytes through the native command", async () => {
+    const savedPath = "C:\\Pictures\\Mirror\\mirror-20260603-123456.png";
+    invoke.mockResolvedValue(savedPath);
+
+    const result = desktopApi.savePhoto(new Uint8Array([1, 2, 3]));
 
     expect(invoke).toHaveBeenCalledWith("save_photo", {
       pngBytes: [1, 2, 3],
     });
+    expect(result).toBe(invoke.mock.results[0].value);
+    await expect(result).resolves.toBe(savedPath);
   });
 
   it("exits fullscreen when toggled from fullscreen", async () => {
@@ -36,6 +41,14 @@ describe("desktop API", () => {
     await desktopApi.toggleFullscreen();
 
     expect(appWindow.setFullscreen).toHaveBeenCalledWith(false);
+  });
+
+  it("enters fullscreen when toggled from windowed mode", async () => {
+    appWindow.isFullscreen.mockResolvedValue(false);
+
+    await desktopApi.toggleFullscreen();
+
+    expect(appWindow.setFullscreen).toHaveBeenCalledWith(true);
   });
 
   it("delegates always-on-top changes", () => {

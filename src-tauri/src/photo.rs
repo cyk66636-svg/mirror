@@ -1,7 +1,7 @@
 use chrono::{DateTime, Local};
 use std::{
     fs::{self, OpenOptions},
-    io::{ErrorKind, Write},
+    io::{self, ErrorKind, Write},
     path::{Path, PathBuf},
 };
 
@@ -9,30 +9,11 @@ pub fn photo_filename(now: DateTime<Local>) -> String {
     format!("mirror-{}.png", now.format("%Y%m%d-%H%M%S"))
 }
 
-fn available_photo_path(mirror_dir: &Path, now: DateTime<Local>) -> PathBuf {
-    let filename = photo_filename(now);
-    let photo_path = mirror_dir.join(&filename);
-    if !photo_path.exists() {
-        return photo_path;
-    }
-
-    let stem = filename
-        .strip_suffix(".png")
-        .expect("generated photo filename should end in .png");
-    let mut suffix = 1;
-    loop {
-        let photo_path = mirror_dir.join(format!("{stem}-{suffix}.png"));
-        if !photo_path.exists() {
-            return photo_path;
-        }
-        suffix += 1;
-    }
-}
-
-fn save_photo_to(
+fn save_photo_to_with_writer(
     pictures_dir: &Path,
     png_bytes: &[u8],
     now: DateTime<Local>,
+    write_photo: impl FnOnce(&mut fs::File) -> io::Result<()>,
 ) -> Result<PathBuf, String> {
     if png_bytes.is_empty() {
         return Err("The captured photo was empty.".to_string());
@@ -42,23 +23,46 @@ fn save_photo_to(
     fs::create_dir_all(&mirror_dir)
         .map_err(|error| format!("Failed to create the Mirror photo folder: {error}"))?;
 
-    loop {
-        let photo_path = available_photo_path(&mirror_dir, now);
+    let filename = photo_filename(now);
+    let stem = filename
+        .strip_suffix(".png")
+        .expect("generated photo filename should end in .png");
+
+    for suffix in 0.. {
+        let photo_path = if suffix == 0 {
+            mirror_dir.join(&filename)
+        } else {
+            mirror_dir.join(format!("{stem}-{suffix}.png"))
+        };
         match OpenOptions::new()
             .write(true)
             .create_new(true)
             .open(&photo_path)
         {
             Ok(mut photo) => {
-                photo
-                    .write_all(png_bytes)
-                    .map_err(|error| format!("Failed to write the captured photo: {error}"))?;
+                if let Err(error) = write_photo(&mut photo) {
+                    drop(photo);
+                    let _ = fs::remove_file(&photo_path);
+                    return Err(format!("Failed to write the captured photo: {error}"));
+                }
                 return Ok(photo_path);
             }
             Err(error) if error.kind() == ErrorKind::AlreadyExists => {}
             Err(error) => return Err(format!("Failed to save the captured photo: {error}")),
         }
     }
+
+    unreachable!("photo suffix range should not be exhausted")
+}
+
+fn save_photo_to(
+    pictures_dir: &Path,
+    png_bytes: &[u8],
+    now: DateTime<Local>,
+) -> Result<PathBuf, String> {
+    save_photo_to_with_writer(pictures_dir, png_bytes, now, |photo| {
+        photo.write_all(png_bytes)
+    })
 }
 
 #[tauri::command]
@@ -72,10 +76,10 @@ pub fn save_photo(png_bytes: Vec<u8>) -> Result<String, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{available_photo_path, photo_filename, save_photo_to};
+    use super::{photo_filename, save_photo_to, save_photo_to_with_writer};
     use chrono::{DateTime, Local, TimeZone};
     use std::{
-        fs,
+        fs, io,
         path::{Path, PathBuf},
         process,
         time::{SystemTime, UNIX_EPOCH},
@@ -106,7 +110,7 @@ mod tests {
     impl Drop for TestDir {
         fn drop(&mut self) {
             if self.path.exists() {
-                fs::remove_dir_all(&self.path).expect("owned test directory should be removed");
+                let _ = fs::remove_dir_all(&self.path);
             }
         }
     }
@@ -134,20 +138,45 @@ mod tests {
     }
 
     #[test]
-    fn adds_suffix_when_timestamped_photo_exists() {
+    fn saves_with_suffix_without_overwriting_existing_photo() {
         let pictures_dir = TestDir::new();
         let mirror_dir = pictures_dir.path().join("Mirror");
         fs::create_dir(&mirror_dir).expect("Mirror directory should be created");
-        fs::write(
-            mirror_dir.join(photo_filename(fixed_now())),
-            b"existing photo",
-        )
-        .expect("existing photo should be written");
+        let original_path = mirror_dir.join(photo_filename(fixed_now()));
+        fs::write(&original_path, b"original bytes").expect("existing photo should be written");
+
+        let saved_path = save_photo_to(pictures_dir.path(), b"new bytes", fixed_now())
+            .expect("photo should be saved with a suffix");
+
+        assert_eq!(saved_path, mirror_dir.join("mirror-20260603-123456-1.png"));
+        assert_eq!(
+            fs::read(original_path).expect("original photo should be readable"),
+            b"original bytes"
+        );
+        assert_eq!(
+            fs::read(saved_path).expect("suffixed photo should be readable"),
+            b"new bytes"
+        );
+    }
+
+    #[test]
+    fn removes_created_photo_when_write_fails() {
+        let pictures_dir = TestDir::new();
+        let expected_path = pictures_dir
+            .path()
+            .join("Mirror/mirror-20260603-123456.png");
+
+        let error =
+            save_photo_to_with_writer(pictures_dir.path(), b"png bytes", fixed_now(), |_| {
+                Err(io::Error::other("forced write failure"))
+            })
+            .unwrap_err();
 
         assert_eq!(
-            available_photo_path(&mirror_dir, fixed_now()),
-            mirror_dir.join("mirror-20260603-123456-1.png")
+            error,
+            "Failed to write the captured photo: forced write failure"
         );
+        assert!(!expected_path.exists());
     }
 
     #[test]
