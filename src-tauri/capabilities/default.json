@@ -4,8 +4,8 @@
   "description": "Mirror main window permissions",
   "windows": ["main"],
   "permissions": [
-    "core:default",
     "core:window:allow-close",
+    "core:window:allow-is-fullscreen",
     "core:window:allow-set-fullscreen",
     "core:window:allow-set-always-on-top"
   ]
