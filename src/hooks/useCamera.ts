@@ -23,6 +23,7 @@ export function useCamera(initialCameraId?: string) {
   const activeCameraId = useRef<string | undefined>(undefined);
   const retryCameraId = useRef(initialCameraId);
   const requestGeneration = useRef(0);
+  const inventoryGeneration = useRef(0);
 
   const stop = useCallback(() => {
     const currentStream = activeStream.current;
@@ -37,6 +38,7 @@ export function useCamera(initialCameraId?: string) {
       const generation = ++requestGeneration.current;
       let nextStream: MediaStream | undefined;
 
+      ++inventoryGeneration.current;
       stop();
       setStream(undefined);
       setError(undefined);
@@ -107,9 +109,10 @@ export function useCamera(initialCameraId?: string) {
     const mediaDevices = navigator.mediaDevices;
     let disposed = false;
     const refresh = async () => {
+      const generation = ++inventoryGeneration.current;
       try {
         const available = videoInputs(await mediaDevices.enumerateDevices());
-        if (disposed) {
+        if (disposed || generation !== inventoryGeneration.current) {
           return;
         }
         setCameras(available);
@@ -140,6 +143,7 @@ export function useCamera(initialCameraId?: string) {
     return () => {
       disposed = true;
       ++requestGeneration.current;
+      ++inventoryGeneration.current;
       mediaDevices?.removeEventListener("devicechange", handleDeviceChange);
       stop();
     };

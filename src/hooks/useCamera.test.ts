@@ -341,6 +341,54 @@ describe("useCamera", () => {
     expect(frontTrack.stop).not.toHaveBeenCalled();
   });
 
+  it("ignores a stale camera inventory when device changes overlap", async () => {
+    const frontTrack = track("front");
+    const frontStream = stream(frontTrack);
+    const usbStream = stream(track("usb"));
+    const olderRefresh = deferred<MediaDeviceInfo[]>();
+    const newerRefresh = deferred<MediaDeviceInfo[]>();
+    const media = installMediaDevices({
+      devices: [camera("usb")],
+      getUserMedia: vi
+        .fn()
+        .mockResolvedValueOnce(frontStream)
+        .mockResolvedValueOnce(usbStream),
+    });
+    media.enumerateDevices
+      .mockResolvedValueOnce([camera("front")])
+      .mockResolvedValueOnce([camera("front")])
+      .mockReturnValueOnce(olderRefresh.promise)
+      .mockReturnValueOnce(newerRefresh.promise);
+    const { result } = renderHook(() => useCamera("front"));
+    await waitFor(() => expect(result.current.stream).toBe(frontStream));
+    const changeListener = media.addEventListener.mock.calls[0]?.[1] as () => void;
+
+    act(() => {
+      changeListener();
+      changeListener();
+    });
+    await waitFor(() => expect(media.enumerateDevices).toHaveBeenCalledTimes(4));
+
+    await act(async () => {
+      newerRefresh.resolve([camera("front"), camera("usb")]);
+      await newerRefresh.promise;
+    });
+    await waitFor(() => expect(result.current.cameras).toHaveLength(2));
+
+    await act(async () => {
+      olderRefresh.resolve([camera("usb")]);
+      await olderRefresh.promise;
+    });
+
+    expect(result.current.cameras.map(({ deviceId }) => deviceId)).toEqual([
+      "front",
+      "usb",
+    ]);
+    expect(result.current.stream).toBe(frontStream);
+    expect(media.getUserMedia).toHaveBeenCalledOnce();
+    expect(frontTrack.stop).not.toHaveBeenCalled();
+  });
+
   it("reports a stream error when media devices are unavailable", async () => {
     Reflect.deleteProperty(navigator, "mediaDevices");
 
