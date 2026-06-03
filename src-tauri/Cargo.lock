@@ -1755,6 +1755,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "mirror"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "dirs",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+]
+
+[[package]]
 name = "muda"
 version = "0.19.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3019,18 +3031,6 @@ dependencies = [
  "webview2-com",
  "window-vibrancy",
  "windows",
-]
-
-[[package]]
-name = "tauri-app"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "dirs",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
 ]
 
 [[package]]

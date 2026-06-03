@@ -339,7 +339,7 @@ describe("MirrorView", () => {
     expect(activeCamera.retry).toHaveBeenCalledOnce();
   });
 
-  it("patches settings when the active camera id differs", async () => {
+  it("patches settings and notifies when the active camera id differs", async () => {
     const { patchSettings } = renderMirror({
       nextSettings: settings({ selectedCameraId: "front" }),
       nextCamera: cameraState({ cameraId: "usb" }),
@@ -348,6 +348,7 @@ describe("MirrorView", () => {
     await waitFor(() => {
       expect(patchSettings).toHaveBeenCalledWith({ selectedCameraId: "usb" });
     });
+    expect(await screen.findByText("摄像头已切换到可用设备。")).toBeVisible();
   });
 
   it("keeps automatic camera selection unset after resolving a camera", () => {

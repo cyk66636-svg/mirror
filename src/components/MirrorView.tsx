@@ -64,6 +64,7 @@ export function MirrorView() {
       settings.selectedCameraId !== undefined &&
       camera.cameraId !== settings.selectedCameraId
     ) {
+      setToast("摄像头已切换到可用设备。");
       patchSettings({ selectedCameraId: camera.cameraId });
     }
   }, [camera.cameraId, patchSettings, settings.selectedCameraId]);
