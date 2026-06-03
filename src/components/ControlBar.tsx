@@ -4,10 +4,13 @@ export type ControlBarProps = {
   visible: boolean;
   settings: MirrorSettings;
   cameras: MediaDeviceInfo[];
+  canCapture: boolean;
   onPatchSettings: (patch: Partial<MirrorSettings>) => void;
   onSelectCamera: (deviceId: string) => void;
   onCapture: () => void;
+  onRetry: () => void;
   onToggleAlwaysOnTop: () => void;
+  onToggleFullscreen: () => void;
   onExitFullscreen: () => void;
   onClose: () => void;
   onPointerEnter: () => void;
@@ -22,10 +25,13 @@ export function ControlBar({
   visible,
   settings,
   cameras,
+  canCapture,
   onPatchSettings,
   onSelectCamera,
   onCapture,
+  onRetry,
   onToggleAlwaysOnTop,
+  onToggleFullscreen,
   onExitFullscreen,
   onClose,
   onPointerEnter,
@@ -107,6 +113,7 @@ export function ControlBar({
         <select
           aria-label="选择摄像头"
           value={settings.selectedCameraId ?? ""}
+          disabled={cameras.length === 0}
           onChange={(event) => onSelectCamera(event.currentTarget.value)}
         >
           <option value="">自动选择摄像头</option>
@@ -122,8 +129,11 @@ export function ControlBar({
       </div>
 
       <div className="control-bar__group">
-        <button type="button" onClick={onCapture}>
+        <button type="button" disabled={!canCapture} onClick={onCapture}>
           拍照
+        </button>
+        <button type="button" onClick={onRetry}>
+          重试
         </button>
         <button
           type="button"
@@ -140,6 +150,9 @@ export function ControlBar({
           onClick={onToggleAlwaysOnTop}
         >
           窗口置顶
+        </button>
+        <button type="button" onClick={onToggleFullscreen}>
+          切换全屏
         </button>
         <button type="button" onClick={onExitFullscreen}>
           退出全屏

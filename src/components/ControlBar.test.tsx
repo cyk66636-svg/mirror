@@ -17,15 +17,26 @@ function camera(deviceId: string, label: string): MediaDeviceInfo {
   };
 }
 
-function renderControlBar(settings: MirrorSettings = DEFAULT_SETTINGS) {
+function renderControlBar({
+  settings = DEFAULT_SETTINGS,
+  cameras = [camera("front", "Front camera"), camera("usb", "USB camera")],
+  canCapture = true,
+}: {
+  settings?: MirrorSettings;
+  cameras?: MediaDeviceInfo[];
+  canCapture?: boolean;
+} = {}) {
   const props = {
     visible: true,
     settings,
-    cameras: [camera("front", "Front camera"), camera("usb", "USB camera")],
+    cameras,
+    canCapture,
     onPatchSettings: vi.fn(),
     onSelectCamera: vi.fn(),
     onCapture: vi.fn(),
+    onRetry: vi.fn(),
     onToggleAlwaysOnTop: vi.fn(),
+    onToggleFullscreen: vi.fn(),
     onExitFullscreen: vi.fn(),
     onClose: vi.fn(),
     onPointerEnter: vi.fn(),
@@ -57,9 +68,11 @@ describe("ControlBar", () => {
   it("patches layout, ranges, and pin state", async () => {
     const user = userEvent.setup();
     const { props } = renderControlBar({
-      ...DEFAULT_SETTINGS,
-      layout: "studio",
-      controlsPinned: false,
+      settings: {
+        ...DEFAULT_SETTINGS,
+        layout: "studio",
+        controlsPinned: false,
+      },
     });
 
     await user.click(screen.getByRole("button", { name: "灯框" }));
@@ -91,15 +104,36 @@ describe("ControlBar", () => {
       target: { value: "usb" },
     });
     await user.click(screen.getByRole("button", { name: "拍照" }));
+    await user.click(screen.getByRole("button", { name: "重试" }));
     await user.click(screen.getByRole("button", { name: "窗口置顶" }));
+    await user.click(screen.getByRole("button", { name: "切换全屏" }));
     await user.click(screen.getByRole("button", { name: "退出全屏" }));
     await user.click(screen.getByRole("button", { name: "关闭" }));
 
     expect(props.onSelectCamera).toHaveBeenCalledWith("usb");
     expect(props.onCapture).toHaveBeenCalledOnce();
+    expect(props.onRetry).toHaveBeenCalledOnce();
     expect(props.onToggleAlwaysOnTop).toHaveBeenCalledOnce();
+    expect(props.onToggleFullscreen).toHaveBeenCalledOnce();
     expect(props.onExitFullscreen).toHaveBeenCalledOnce();
     expect(props.onClose).toHaveBeenCalledOnce();
+  });
+
+  it("disables unavailable camera selection and capture while keeping retry enabled", async () => {
+    const user = userEvent.setup();
+    const { props } = renderControlBar({
+      cameras: [],
+      canCapture: false,
+    });
+
+    expect(screen.getByLabelText("选择摄像头")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "拍照" })).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: "拍照" }));
+    await user.click(screen.getByRole("button", { name: "重试" }));
+
+    expect(props.onCapture).not.toHaveBeenCalled();
+    expect(props.onRetry).toHaveBeenCalledOnce();
   });
 
   it("notifies when the pointer enters and leaves the bar", () => {

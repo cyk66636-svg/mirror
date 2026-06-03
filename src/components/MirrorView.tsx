@@ -29,6 +29,7 @@ export function MirrorView() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const [toast, setToast] = useState("");
+  const canCapture = camera.stream !== undefined && camera.error === undefined;
 
   useEffect(() => {
     if (!toast) {
@@ -63,7 +64,7 @@ export function MirrorView() {
   const takePhoto = useCallback(async () => {
     const video = videoRef.current;
     const viewport = viewportRef.current;
-    if (!video || !viewport) {
+    if (!canCapture || !video || !viewport) {
       return;
     }
 
@@ -74,7 +75,7 @@ export function MirrorView() {
     } catch {
       setToast("照片保存失败，请重试。");
     }
-  }, [settings.zoom]);
+  }, [canCapture, settings.zoom]);
 
   const toggleAlwaysOnTop = useCallback(() => {
     const nextAlwaysOnTop = !settings.alwaysOnTop;
@@ -86,6 +87,10 @@ export function MirrorView() {
 
   const exitFullscreen = useCallback(() => {
     void desktopApi.exitFullscreen();
+  }, []);
+
+  const toggleFullscreen = useCallback(() => {
+    void desktopApi.toggleFullscreen();
   }, []);
 
   const close = useCallback(() => {
@@ -158,10 +163,13 @@ export function MirrorView() {
         visible={controls.visible}
         settings={settings}
         cameras={camera.cameras}
+        canCapture={canCapture}
         onPatchSettings={patchSettings}
         onSelectCamera={selectCamera}
         onCapture={takePhoto}
+        onRetry={camera.retry}
         onToggleAlwaysOnTop={toggleAlwaysOnTop}
+        onToggleFullscreen={toggleFullscreen}
         onExitFullscreen={exitFullscreen}
         onClose={close}
         onPointerEnter={controls.reveal}

@@ -190,6 +190,20 @@ describe("MirrorView", () => {
     expect(desktopApi.setAlwaysOnTop).toHaveBeenCalledWith(true);
   });
 
+  it("captures with the Space shortcut outside form controls", async () => {
+    renderMirror();
+
+    fireEvent.keyDown(window, { key: " ", code: "Space" });
+    fireEvent.keyDown(screen.getByLabelText("亮度"), {
+      key: " ",
+      code: "Space",
+    });
+
+    await waitFor(() => {
+      expect(capturePhoto).toHaveBeenCalledOnce();
+    });
+  });
+
   it("reveals controls when the pointer moves near the bottom edge", () => {
     const controls = controlState({ visible: false });
     const { container } = renderMirror({ nextControls: controls });
@@ -199,6 +213,88 @@ describe("MirrorView", () => {
     fireEvent.pointerMove(shell, { clientY: 10 });
 
     expect(controls.reveal).toHaveBeenCalledOnce();
+  });
+
+  it("wires hidden controls and pinned settings to the visibility hook", () => {
+    const controls = controlState({ visible: false });
+
+    renderMirror({
+      nextSettings: settings({ controlsPinned: false }),
+      nextControls: controls,
+    });
+
+    const bar = screen.getByLabelText("镜子控制面板");
+    expect(useControlVisibility).toHaveBeenCalledWith(false);
+    expect(bar).not.toHaveClass("is-visible");
+
+    fireEvent.pointerEnter(bar);
+    fireEvent.pointerLeave(bar);
+
+    expect(controls.reveal).toHaveBeenCalledOnce();
+    expect(controls.scheduleHide).toHaveBeenCalledOnce();
+  });
+
+  it("renders the selected fill-light layout and camera preview composition", () => {
+    const activeStream = mediaStream();
+    const { container } = renderMirror({
+      nextSettings: settings({ layout: "frame", zoom: 1.25 }),
+      nextCamera: cameraState({ stream: activeStream }),
+    });
+
+    expect(container.querySelector(".fill-light--frame")).toBeInTheDocument();
+    expect(container.querySelector(".fill-light-frame")).toBeInTheDocument();
+    expect(container.querySelector(".camera-preview")).toBeInTheDocument();
+    const video = container.querySelector(".camera-video") as HTMLVideoElement;
+
+    expect(video.srcObject).toBe(activeStream);
+    expect(video).toHaveStyle({ transform: "scaleX(-1) scale(1.25)" });
+  });
+
+  it("wires control retry and fullscreen toggle actions", async () => {
+    const user = userEvent.setup();
+    const activeCamera = cameraState();
+
+    renderMirror({ nextCamera: activeCamera });
+
+    await user.click(screen.getByRole("button", { name: "重试" }));
+    await user.click(screen.getByRole("button", { name: "切换全屏" }));
+
+    expect(activeCamera.retry).toHaveBeenCalledOnce();
+    expect(desktopApi.toggleFullscreen).toHaveBeenCalledOnce();
+  });
+
+  it("disables capture when the camera is unavailable or in an error state", async () => {
+    const user = userEvent.setup();
+    const activeCamera = cameraState({
+      stream: undefined,
+      error: "stream-error",
+    });
+
+    renderMirror({ nextCamera: activeCamera });
+
+    const capture = screen.getByRole("button", { name: "拍照" });
+    expect(capture).toBeDisabled();
+    await user.click(capture);
+
+    expect(capturePhoto).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("选择摄像头")).toBeEnabled();
+  });
+
+  it("shows the camera error state and retries from the overlay", async () => {
+    const user = userEvent.setup();
+    const activeCamera = cameraState({
+      stream: undefined,
+      error: "permission-denied",
+    });
+
+    renderMirror({ nextCamera: activeCamera });
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "需要摄像头权限才能使用镜子。请允许访问后重试。",
+    );
+    await user.click(screen.getAllByRole("button", { name: "重试" })[0]);
+
+    expect(activeCamera.retry).toHaveBeenCalledOnce();
   });
 
   it("patches settings when the active camera id differs", async () => {

@@ -202,6 +202,18 @@ select {
   background: rgba(255, 255, 255, 0.18);
 }
 
+.control-bar button:disabled,
+.control-bar select:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.control-bar button:disabled:hover,
+.control-bar select:disabled:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.12);
+}
+
 .control-bar button:focus-visible,
 .camera-error button:focus-visible,
 .control-bar select:focus-visible,
