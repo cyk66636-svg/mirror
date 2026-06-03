@@ -5,7 +5,11 @@ export async function capturePhoto(
   viewport: HTMLElement,
   zoom: number,
 ): Promise<Uint8Array> {
-  if (video.videoWidth === 0 || video.videoHeight === 0) {
+  if (
+    video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA ||
+    video.videoWidth === 0 ||
+    video.videoHeight === 0
+  ) {
     throw new Error("The camera frame is not ready.");
   }
 
@@ -17,8 +21,8 @@ export async function capturePhoto(
     zoom,
   );
   const canvas = document.createElement("canvas");
-  canvas.width = Math.round(sw);
-  canvas.height = Math.round(sh);
+  canvas.width = Math.max(1, Math.round(sw));
+  canvas.height = Math.max(1, Math.round(sh));
   const context = canvas.getContext("2d");
 
   if (!context) {

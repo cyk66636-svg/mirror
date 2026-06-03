@@ -1,8 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { capturePhoto } from "./capturePhoto";
 
-function video(videoWidth = 1920, videoHeight = 1080) {
-  return { videoWidth, videoHeight } as HTMLVideoElement;
+function video(
+  videoWidth = 1920,
+  videoHeight = 1080,
+  readyState: number = HTMLMediaElement.HAVE_CURRENT_DATA,
+) {
+  return { readyState, videoWidth, videoHeight } as HTMLVideoElement;
 }
 
 function viewport(clientWidth = 500, clientHeight = 500) {
@@ -48,6 +52,15 @@ describe("capturePhoto", () => {
     expect(createElement).not.toHaveBeenCalled();
   });
 
+  it("rejects a camera frame without current image data before creating a canvas", async () => {
+    const createElement = vi.spyOn(document, "createElement");
+
+    await expect(
+      capturePhoto(video(1920, 1080, HTMLMediaElement.HAVE_METADATA), viewport(), 1),
+    ).rejects.toThrow(new Error("The camera frame is not ready."));
+    expect(createElement).not.toHaveBeenCalled();
+  });
+
   it("captures the mirrored cover crop as PNG bytes", async () => {
     const drawingContext = context();
     const blob = {
@@ -80,6 +93,32 @@ describe("capturePhoto", () => {
       "image/png",
     );
     expect(pngBytes).toEqual(new Uint8Array([1, 2, 3]));
+  });
+
+  it("rounds tiny positive crop dimensions up to a drawable canvas pixel", async () => {
+    const drawingContext = context();
+    const blob = {
+      arrayBuffer: vi.fn().mockResolvedValue(new Uint8Array([4]).buffer),
+    } as unknown as Blob;
+    const { canvas } = installCanvas(drawingContext, blob);
+
+    const cameraFrame = video(0.4, 1000);
+
+    await capturePhoto(cameraFrame, viewport(1, 5000), 1);
+
+    expect(canvas.width).toBe(1);
+    expect(canvas.height).toBe(1000);
+    expect(drawingContext.drawImage).toHaveBeenCalledWith(
+      cameraFrame,
+      0.1,
+      0,
+      0.2,
+      1000,
+      0,
+      0,
+      1,
+      1000,
+    );
   });
 
   it("rejects when a 2d canvas context is unavailable", async () => {
