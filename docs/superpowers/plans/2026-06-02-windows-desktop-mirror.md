@@ -1960,8 +1960,9 @@ Create `src-tauri/windows/installer-hooks.nsh`:
 
 ```nsh
 !macro NSIS_HOOK_PREINSTALL
-  StrCpy $INSTDIR "D:\Mirror"
+  StrCpy $INSTDIR "D:\MirrorApp"
   CreateDirectory "$INSTDIR"
+  SetOutPath "$INSTDIR"
 !macroend
 ```
 
@@ -1989,7 +1990,7 @@ Expected: an NSIS installer is created under `src-tauri\target\release\bundle\ns
 
 Run the generated NSIS setup and complete installation.
 
-Expected: setup creates `D:\Mirror` and installs the application into that folder.
+Expected: setup creates `D:\MirrorApp` and installs the application into that folder.
 
 - [ ] **Step 6: Run final checks**
 
@@ -2027,4 +2028,4 @@ git commit -m "feat: package Mirror under D drive folder"
 - Persisted preferences: Task 3 and Task 6.
 - Camera and photo recovery states: Task 5, Task 9, and Task 10.
 - Packaged Windows installer: Task 10.
-- Fixed `D:\Mirror` installation folder: Task 10.
+- Fixed `D:\MirrorApp` installation folder: Task 10.
