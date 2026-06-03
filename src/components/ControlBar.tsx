@@ -6,7 +6,7 @@ export type ControlBarProps = {
   cameras: MediaDeviceInfo[];
   canCapture: boolean;
   onPatchSettings: (patch: Partial<MirrorSettings>) => void;
-  onSelectCamera: (deviceId: string) => void;
+  onSelectCamera: (deviceId?: string) => void;
   onCapture: () => void;
   onRetry: () => void;
   onToggleAlwaysOnTop: () => void;
@@ -45,6 +45,8 @@ export function ControlBar({
     <aside
       className={`control-bar${visible ? " is-visible" : ""}`}
       aria-label="镜子控制面板"
+      aria-hidden={visible ? undefined : true}
+      inert={!visible}
       onPointerEnter={onPointerEnter}
       onPointerLeave={onPointerLeave}
     >
@@ -114,7 +116,9 @@ export function ControlBar({
           aria-label="选择摄像头"
           value={settings.selectedCameraId ?? ""}
           disabled={cameras.length === 0}
-          onChange={(event) => onSelectCamera(event.currentTarget.value)}
+          onChange={(event) =>
+            onSelectCamera(event.currentTarget.value || undefined)
+          }
         >
           <option value="">自动选择摄像头</option>
           {selectedCameraMissing ? (

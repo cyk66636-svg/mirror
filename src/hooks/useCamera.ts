@@ -155,6 +155,6 @@ export function useCamera(initialCameraId?: string) {
     cameraId,
     error,
     retry: () => start(retryCameraId.current),
-    selectCamera: (nextCameraId: string) => start(nextCameraId),
+    selectCamera: (nextCameraId?: string) => start(nextCameraId),
   };
 }

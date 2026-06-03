@@ -80,7 +80,7 @@ function cameraState(patch: Partial<CameraState> = {}): CameraState {
     error: undefined,
     retry: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
     selectCamera: vi
-      .fn<(deviceId: string) => Promise<void>>()
+      .fn<(deviceId?: string) => Promise<void>>()
       .mockResolvedValue(undefined),
     ...patch,
   };
@@ -198,6 +198,38 @@ describe("MirrorView", () => {
     expect(desktopApi.setAlwaysOnTop).toHaveBeenCalledWith(true);
   });
 
+  it("reports window action failures and rolls back always-on-top state", async () => {
+    const user = userEvent.setup();
+    const { patchSettings } = renderMirror({
+      nextSettings: settings({ alwaysOnTop: false }),
+    });
+    vi.mocked(desktopApi.setAlwaysOnTop).mockClear();
+    vi.mocked(desktopApi.setAlwaysOnTop).mockRejectedValueOnce(
+      new Error("not allowed"),
+    );
+
+    await user.click(screen.getByRole("button", { name: "窗口置顶" }));
+
+    expect(patchSettings).toHaveBeenCalledWith({ alwaysOnTop: true });
+    await waitFor(() => {
+      expect(patchSettings).toHaveBeenCalledWith({ alwaysOnTop: false });
+    });
+    expect(await screen.findByText("窗口操作失败，请重试。")).toBeVisible();
+  });
+
+  it("reports fullscreen toggle failures", async () => {
+    const user = userEvent.setup();
+    vi.mocked(desktopApi.toggleFullscreen).mockRejectedValueOnce(
+      new Error("window unavailable"),
+    );
+
+    renderMirror();
+
+    await user.click(screen.getByRole("button", { name: "切换全屏" }));
+
+    expect(await screen.findByText("窗口操作失败，请重试。")).toBeVisible();
+  });
+
   it("captures with the Space shortcut outside form controls", async () => {
     renderMirror();
 
@@ -234,6 +266,8 @@ describe("MirrorView", () => {
     const bar = screen.getByLabelText("镜子控制面板");
     expect(useControlVisibility).toHaveBeenCalledWith(false);
     expect(bar).not.toHaveClass("is-visible");
+    expect(bar).toHaveAttribute("aria-hidden", "true");
+    expect(bar).toHaveAttribute("inert");
 
     fireEvent.pointerEnter(bar);
     fireEvent.pointerLeave(bar);
@@ -316,6 +350,17 @@ describe("MirrorView", () => {
     });
   });
 
+  it("keeps automatic camera selection unset after resolving a camera", () => {
+    const { patchSettings } = renderMirror({
+      nextSettings: settings({ selectedCameraId: undefined }),
+      nextCamera: cameraState({ cameraId: "front" }),
+    });
+
+    expect(patchSettings).not.toHaveBeenCalledWith({
+      selectedCameraId: "front",
+    });
+  });
+
   it("patches settings and asks the camera hook to switch cameras", () => {
     const { patchSettings, camera: activeCamera } = renderMirror();
 
@@ -325,5 +370,16 @@ describe("MirrorView", () => {
 
     expect(patchSettings).toHaveBeenCalledWith({ selectedCameraId: "usb" });
     expect(activeCamera.selectCamera).toHaveBeenCalledWith("usb");
+  });
+
+  it("keeps automatic camera selection unset when auto is selected", () => {
+    const { patchSettings, camera: activeCamera } = renderMirror();
+
+    fireEvent.change(screen.getByLabelText("选择摄像头"), {
+      target: { value: "" },
+    });
+
+    expect(patchSettings).toHaveBeenCalledWith({ selectedCameraId: undefined });
+    expect(activeCamera.selectCamera).toHaveBeenCalledWith(undefined);
   });
 });

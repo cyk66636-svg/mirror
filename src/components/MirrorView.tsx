@@ -28,8 +28,20 @@ export function MirrorView() {
   const controls = useControlVisibility(settings.controlsPinned);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
+  const initialAlwaysOnTop = useRef(settings.alwaysOnTop);
   const [toast, setToast] = useState("");
   const canCapture = camera.stream !== undefined && camera.error === undefined;
+
+  const showWindowFailure = useCallback(() => {
+    setToast("窗口操作失败，请重试。");
+  }, []);
+
+  const runWindowAction = useCallback(
+    (action: () => Promise<void>) => {
+      void action().catch(showWindowFailure);
+    },
+    [showWindowFailure],
+  );
 
   useEffect(() => {
     if (!toast) {
@@ -41,12 +53,15 @@ export function MirrorView() {
   }, [toast]);
 
   useEffect(() => {
-    void desktopApi.setAlwaysOnTop(settings.alwaysOnTop).catch(() => undefined);
-  }, []);
+    void desktopApi
+      .setAlwaysOnTop(initialAlwaysOnTop.current)
+      .catch(showWindowFailure);
+  }, [showWindowFailure]);
 
   useEffect(() => {
     if (
       camera.cameraId !== undefined &&
+      settings.selectedCameraId !== undefined &&
       camera.cameraId !== settings.selectedCameraId
     ) {
       patchSettings({ selectedCameraId: camera.cameraId });
@@ -54,7 +69,7 @@ export function MirrorView() {
   }, [camera.cameraId, patchSettings, settings.selectedCameraId]);
 
   const selectCamera = useCallback(
-    (deviceId: string) => {
+    (deviceId?: string) => {
       patchSettings({ selectedCameraId: deviceId });
       void camera.selectCamera(deviceId);
     },
@@ -80,33 +95,34 @@ export function MirrorView() {
   const toggleAlwaysOnTop = useCallback(() => {
     const nextAlwaysOnTop = !settings.alwaysOnTop;
     patchSettings({ alwaysOnTop: nextAlwaysOnTop });
-    void desktopApi
-      .setAlwaysOnTop(nextAlwaysOnTop)
-      .catch(() => undefined);
-  }, [patchSettings, settings.alwaysOnTop]);
+    void desktopApi.setAlwaysOnTop(nextAlwaysOnTop).catch(() => {
+      patchSettings({ alwaysOnTop: settings.alwaysOnTop });
+      showWindowFailure();
+    });
+  }, [patchSettings, settings.alwaysOnTop, showWindowFailure]);
 
   const exitFullscreen = useCallback(() => {
-    void desktopApi.exitFullscreen();
-  }, []);
+    runWindowAction(desktopApi.exitFullscreen);
+  }, [runWindowAction]);
 
   const toggleFullscreen = useCallback(() => {
-    void desktopApi.toggleFullscreen();
-  }, []);
+    runWindowAction(desktopApi.toggleFullscreen);
+  }, [runWindowAction]);
 
   const close = useCallback(() => {
-    void desktopApi.close();
-  }, []);
+    runWindowAction(desktopApi.close);
+  }, [runWindowAction]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        void desktopApi.exitFullscreen();
+        exitFullscreen();
         return;
       }
 
       if (event.key === "F11") {
         event.preventDefault();
-        void desktopApi.toggleFullscreen();
+        toggleFullscreen();
         return;
       }
 
@@ -127,7 +143,7 @@ export function MirrorView() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [takePhoto, toggleAlwaysOnTop]);
+  }, [exitFullscreen, takePhoto, toggleAlwaysOnTop, toggleFullscreen]);
 
   const handlePointerMove = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {

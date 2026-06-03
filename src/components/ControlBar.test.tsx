@@ -18,16 +18,18 @@ function camera(deviceId: string, label: string): MediaDeviceInfo {
 }
 
 function renderControlBar({
+  visible = true,
   settings = DEFAULT_SETTINGS,
   cameras = [camera("front", "Front camera"), camera("usb", "USB camera")],
   canCapture = true,
 }: {
+  visible?: boolean;
   settings?: MirrorSettings;
   cameras?: MediaDeviceInfo[];
   canCapture?: boolean;
 } = {}) {
   const props = {
-    visible: true,
+    visible,
     settings,
     cameras,
     canCapture,
@@ -56,6 +58,8 @@ describe("ControlBar", () => {
     const bar = screen.getByLabelText("镜子控制面板");
 
     expect(bar).toHaveClass("control-bar", "is-visible");
+    expect(bar).not.toHaveAttribute("aria-hidden");
+    expect(bar).not.toHaveAttribute("inert");
     screen.getAllByRole("button").forEach((button) => {
       expect(button).toHaveAttribute("type", "button");
     });
@@ -63,6 +67,8 @@ describe("ControlBar", () => {
     rerender(<ControlBar {...props} visible={false} />);
 
     expect(bar).not.toHaveClass("is-visible");
+    expect(bar).toHaveAttribute("aria-hidden", "true");
+    expect(bar).toHaveAttribute("inert");
   });
 
   it("patches layout, ranges, and pin state", async () => {
@@ -103,6 +109,9 @@ describe("ControlBar", () => {
     fireEvent.change(screen.getByLabelText("选择摄像头"), {
       target: { value: "usb" },
     });
+    fireEvent.change(screen.getByLabelText("选择摄像头"), {
+      target: { value: "" },
+    });
     await user.click(screen.getByRole("button", { name: "拍照" }));
     await user.click(screen.getByRole("button", { name: "重试" }));
     await user.click(screen.getByRole("button", { name: "窗口置顶" }));
@@ -111,6 +120,7 @@ describe("ControlBar", () => {
     await user.click(screen.getByRole("button", { name: "关闭" }));
 
     expect(props.onSelectCamera).toHaveBeenCalledWith("usb");
+    expect(props.onSelectCamera).toHaveBeenCalledWith(undefined);
     expect(props.onCapture).toHaveBeenCalledOnce();
     expect(props.onRetry).toHaveBeenCalledOnce();
     expect(props.onToggleAlwaysOnTop).toHaveBeenCalledOnce();
