@@ -1,0 +1,304 @@
+:root {
+  color: #f8fafc;
+  background: #000;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root,
+.mirror-shell {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  background: #000;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+.mirror-shell {
+  position: relative;
+  display: grid;
+  place-items: center;
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.08), transparent 32rem),
+    #000;
+}
+
+.mirror-stage {
+  position: relative;
+  z-index: 1;
+  width: min(1180px, calc(100vw - 80px));
+  height: min(760px, calc(100vh - 80px));
+  overflow: hidden;
+}
+
+.mirror-shell--studio .mirror-stage {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 32px;
+  box-shadow:
+    0 24px 80px rgba(0, 0, 0, 0.5),
+    0 0 140px rgba(255, 255, 255, 0.12);
+}
+
+.mirror-shell--frame .mirror-stage {
+  width: 100vw;
+  height: 100vh;
+}
+
+.camera-preview {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #030303;
+}
+
+.camera-video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform-origin: center;
+  transition: transform 180ms ease;
+}
+
+.fill-light,
+.fill-light-background,
+.fill-light-frame {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.fill-light {
+  z-index: auto;
+}
+
+.fill-light-background {
+  z-index: 0;
+  transition:
+    background-color 180ms ease,
+    opacity 180ms ease;
+}
+
+.fill-light-frame {
+  z-index: 2;
+  background-color: transparent !important;
+  border: clamp(18px, 4vw, 48px) solid currentColor;
+  box-shadow:
+    inset 0 0 44px currentColor,
+    0 0 72px currentColor;
+  transition:
+    color 180ms ease,
+    opacity 180ms ease;
+}
+
+.control-bar {
+  position: absolute;
+  right: 24px;
+  bottom: 24px;
+  left: 24px;
+  z-index: 4;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 14px;
+  color: #f8fafc;
+  background: rgba(10, 14, 22, 0.58);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 24px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.42);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(28px);
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+  backdrop-filter: blur(22px) saturate(130%);
+}
+
+.control-bar.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.control-bar__group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.control-bar__group--ranges {
+  flex: 1 1 420px;
+}
+
+.control-field {
+  display: grid;
+  grid-template-columns: 3rem minmax(7rem, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-width: 160px;
+  color: rgba(248, 250, 252, 0.86);
+  font-size: 0.9rem;
+}
+
+.control-field input {
+  width: 100%;
+  accent-color: #f8fafc;
+}
+
+.control-bar button,
+.control-bar select,
+.camera-error button {
+  min-height: 38px;
+  color: #f8fafc;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  outline: none;
+}
+
+.control-bar button,
+.camera-error button {
+  padding: 0 14px;
+  cursor: pointer;
+}
+
+.control-bar select {
+  max-width: min(58vw, 240px);
+  padding: 0 34px 0 14px;
+}
+
+.control-bar button:hover,
+.camera-error button:hover,
+.control-bar select:hover {
+  border-color: rgba(255, 255, 255, 0.42);
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.control-bar button:focus-visible,
+.camera-error button:focus-visible,
+.control-bar select:focus-visible,
+.control-field input:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.88);
+  outline-offset: 3px;
+}
+
+.control-bar button.is-active,
+.control-bar button[aria-pressed="true"] {
+  color: #0f172a;
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.camera-error {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 3;
+  width: min(420px, calc(100vw - 48px));
+  padding: 24px;
+  color: #f8fafc;
+  text-align: center;
+  background: rgba(8, 12, 20, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 24px;
+  box-shadow: 0 24px 72px rgba(0, 0, 0, 0.48);
+  transform: translate(-50%, -50%);
+  backdrop-filter: blur(20px) saturate(130%);
+}
+
+.camera-error p {
+  margin: 0 0 18px;
+  line-height: 1.6;
+}
+
+.toast-region {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  z-index: 5;
+  max-width: min(420px, calc(100vw - 48px));
+  padding: 12px 16px;
+  color: #f8fafc;
+  background: rgba(10, 14, 22, 0.74);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 16px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.34);
+  opacity: 0;
+  transform: translateY(-12px);
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+  backdrop-filter: blur(18px) saturate(130%);
+}
+
+.toast-region.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (max-width: 720px) {
+  .mirror-stage,
+  .mirror-shell--studio .mirror-stage {
+    width: 100vw;
+    height: 100vh;
+    border-radius: 0;
+  }
+
+  .control-bar {
+    right: 10px;
+    bottom: 10px;
+    left: 10px;
+    max-height: 58vh;
+    padding: 12px;
+    overflow: auto;
+    border-radius: 20px;
+  }
+
+  .control-bar__group,
+  .control-bar__group--ranges {
+    flex: 1 1 100%;
+  }
+
+  .control-field {
+    grid-template-columns: 2.75rem minmax(0, 1fr);
+    min-width: 100%;
+  }
+
+  .control-bar select {
+    max-width: 100%;
+  }
+
+  .toast-region {
+    top: 12px;
+    right: 12px;
+    left: 12px;
+    max-width: none;
+  }
+}

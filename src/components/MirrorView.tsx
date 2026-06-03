@@ -1,0 +1,173 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import { capturePhoto } from "../features/camera/capturePhoto";
+import { desktopApi } from "../features/desktop/desktopApi";
+import { useCamera } from "../hooks/useCamera";
+import { useControlVisibility } from "../hooks/useControlVisibility";
+import { useMirrorSettings } from "../hooks/useMirrorSettings";
+import { CameraErrorState } from "./CameraErrorState";
+import { CameraPreview } from "./CameraPreview";
+import { ControlBar } from "./ControlBar";
+import { FillLight } from "./FillLight";
+import { ToastRegion } from "./ToastRegion";
+
+const CONTROL_REVEAL_EDGE_PX = 120;
+const TOAST_DURATION_MS = 3200;
+
+function isTypingTarget(target: EventTarget | null): boolean {
+  return (
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLSelectElement ||
+    target instanceof HTMLButtonElement ||
+    target instanceof HTMLTextAreaElement
+  );
+}
+
+export function MirrorView() {
+  const { settings, patchSettings } = useMirrorSettings();
+  const camera = useCamera(settings.selectedCameraId);
+  const controls = useControlVisibility(settings.controlsPinned);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const [toast, setToast] = useState("");
+
+  useEffect(() => {
+    if (!toast) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => setToast(""), TOAST_DURATION_MS);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
+
+  useEffect(() => {
+    void desktopApi.setAlwaysOnTop(settings.alwaysOnTop).catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    if (
+      camera.cameraId !== undefined &&
+      camera.cameraId !== settings.selectedCameraId
+    ) {
+      patchSettings({ selectedCameraId: camera.cameraId });
+    }
+  }, [camera.cameraId, patchSettings, settings.selectedCameraId]);
+
+  const selectCamera = useCallback(
+    (deviceId: string) => {
+      patchSettings({ selectedCameraId: deviceId });
+      void camera.selectCamera(deviceId);
+    },
+    [camera, patchSettings],
+  );
+
+  const takePhoto = useCallback(async () => {
+    const video = videoRef.current;
+    const viewport = viewportRef.current;
+    if (!video || !viewport) {
+      return;
+    }
+
+    try {
+      const pngBytes = await capturePhoto(video, viewport, settings.zoom);
+      const path = await desktopApi.savePhoto(pngBytes);
+      setToast(`照片已保存：${path}`);
+    } catch {
+      setToast("照片保存失败，请重试。");
+    }
+  }, [settings.zoom]);
+
+  const toggleAlwaysOnTop = useCallback(() => {
+    const nextAlwaysOnTop = !settings.alwaysOnTop;
+    patchSettings({ alwaysOnTop: nextAlwaysOnTop });
+    void desktopApi
+      .setAlwaysOnTop(nextAlwaysOnTop)
+      .catch(() => undefined);
+  }, [patchSettings, settings.alwaysOnTop]);
+
+  const exitFullscreen = useCallback(() => {
+    void desktopApi.exitFullscreen();
+  }, []);
+
+  const close = useCallback(() => {
+    void desktopApi.close();
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        void desktopApi.exitFullscreen();
+        return;
+      }
+
+      if (event.key === "F11") {
+        event.preventDefault();
+        void desktopApi.toggleFullscreen();
+        return;
+      }
+
+      if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "t") {
+        event.preventDefault();
+        toggleAlwaysOnTop();
+        return;
+      }
+
+      if (
+        (event.key === " " || event.code === "Space") &&
+        !isTypingTarget(event.target)
+      ) {
+        event.preventDefault();
+        void takePhoto();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [takePhoto, toggleAlwaysOnTop]);
+
+  const handlePointerMove = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      if (window.innerHeight - event.clientY <= CONTROL_REVEAL_EDGE_PX) {
+        controls.reveal();
+      }
+    },
+    [controls],
+  );
+
+  return (
+    <div
+      className={`mirror-shell mirror-shell--${settings.layout}`}
+      onPointerMove={handlePointerMove}
+    >
+      <FillLight
+        brightness={settings.brightness}
+        colorTemperature={settings.colorTemperature}
+        layout={settings.layout}
+      />
+      <main className="mirror-stage" aria-label="全屏镜子">
+        <CameraPreview
+          stream={camera.stream}
+          zoom={settings.zoom}
+          videoRef={videoRef}
+          viewportRef={viewportRef}
+        />
+        {camera.error ? (
+          <CameraErrorState error={camera.error} onRetry={camera.retry} />
+        ) : null}
+      </main>
+      <ControlBar
+        visible={controls.visible}
+        settings={settings}
+        cameras={camera.cameras}
+        onPatchSettings={patchSettings}
+        onSelectCamera={selectCamera}
+        onCapture={takePhoto}
+        onToggleAlwaysOnTop={toggleAlwaysOnTop}
+        onExitFullscreen={exitFullscreen}
+        onClose={close}
+        onPointerEnter={controls.reveal}
+        onPointerLeave={controls.scheduleHide}
+      />
+      <ToastRegion message={toast} />
+    </div>
+  );
+}
