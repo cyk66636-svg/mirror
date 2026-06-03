@@ -135,6 +135,14 @@ afterEach(() => {
 });
 
 describe("MirrorView", () => {
+  it("restores the persisted always-on-top preference on mount", async () => {
+    renderMirror({ nextSettings: settings({ alwaysOnTop: true }) });
+
+    await waitFor(() => {
+      expect(desktopApi.setAlwaysOnTop).toHaveBeenCalledWith(true);
+    });
+  });
+
   it("captures a photo, saves it, and shows the saved path", async () => {
     const user = userEvent.setup();
     const pngBytes = new Uint8Array([9, 8, 7]);
