@@ -17,6 +17,11 @@ display into an adjustable fill light.
 - Saves mirrored PNG photos to `Pictures\Mirror`
 - NSIS installer configured to install under `D:\MirrorApp`
 
+## Download
+
+Download the latest Windows installer from the
+[Mirror v0.1.0 release](https://github.com/cyk66636-svg/mirror/releases/tag/v0.1.0).
+
 ## Keyboard Shortcuts
 
 - `Esc`: exit fullscreen
